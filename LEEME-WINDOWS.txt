@@ -1,0 +1,28 @@
+DECISOR RAPIDO DE NOTICIAS - INSTRUCCIONES PARA WINDOWS
+=======================================================
+
+ANTES DE EMPEZAR, ten a mano (por ejemplo, en un bloc de notas):
+  1. La clave de Anthropic (console.anthropic.com > API Keys). Recuerda recargar saldo en Billing.
+  2. El codigo de tu bot de Telegram (te lo da @BotFather).
+
+INSTALAR (solo la primera vez)
+  1. Doble clic en INSTALAR.bat
+     - Si Windows muestra "Windows protegio su PC", pulsa "Mas informacion" y despues "Ejecutar de todas formas".
+  2. Cuando lo pida, pega la clave de Anthropic (clic derecho del raton = pegar) y pulsa Intro.
+  3. Pega el codigo del bot de Telegram y pulsa Intro.
+  4. Abre Telegram en el movil, busca tu bot y escribele: hola
+     El bot te contestara: "Este bot ya esta vinculado contigo".
+
+USAR (cada vez)
+  1. Doble clic en ARRANCAR.bat
+  2. Te llegara a Telegram: "Decisor arrancado".
+  3. Deja la ventana negra abierta (puedes minimizarla). Si la cierras, la app se para.
+  4. Pruebalo escribiendo al bot:
+       /probar We are imposing a 100% tariff on all semiconductors
+  5. Escribe /ayuda al bot para ver todo lo que puede hacer.
+
+IMPORTANTE
+  - El ordenador debe estar encendido y sin suspenderse:
+    Configuracion > Sistema > Inicio/apagado > "Suspender" = Nunca (cuando esta enchufado).
+  - Empieza en modo simulado: ningun boton toca tu dinero hasta que conectemos IBKR.
+  - Nunca compartas el fichero .env: contiene tus claves.
