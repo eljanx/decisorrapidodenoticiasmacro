@@ -138,3 +138,17 @@ Clave de diseño: **dos fases**. Una alerta inmediata ("ha publicado esto y pare
 3. ¿Qué **presupuesto mensual** aceptas para las APIs (X, LLM, datos)?
 4. ¿Te vale **Telegram** como interfaz en el MVP o necesitas desde el principio una app propia?
 5. ¿Qué **horizonte** buscas: minutos (scalping de la noticia) u horas o días (efectos de segundo orden)? Mi recomendación es horas o días, por lo explicado en el apartado 1.3.
+
+---
+
+## 6. Decisiones tomadas (respuestas del usuario, 3-oct-2026)
+
+| Pregunta | Respuesta | Consecuencia en la v1 |
+|---|---|---|
+| Uso | Personal | Un único usuario. El bot de Telegram solo obedece a un `chat_id`. |
+| Instrumentos | Todos | Ejecución automática de acciones, ETFs, futuros (contrato continuo) y divisas. Las opciones se proponen pero se ejecutan a mano. |
+| Presupuesto | APIs gratuitas para empezar | Truth Social por API pública con polling y RSS de respaldo. X desactivado salvo token de pago. Claude sí es de pago (céntimos por análisis). |
+| Interfaz | Telegram (lo instalará) | Bot con botones. Modo `--consola` para probar sin Telegram. |
+| Horizonte | Comprar minutos después y mantener lo que la app considere | La IA propone el horizonte. La orden lleva stop y objetivo (bracket) y, al cumplirse el horizonte, la app pregunta si cerrar o mantener. |
+
+**Aviso sobre el horizonte de minutos**: es justo la franja en la que más compiten los algoritmos (apartado 1.3). Por eso la IA recibe la variación de precio desde la publicación (paso 2b) y puede recomendar no operar o buscar efectos de segundo orden. Hay que medir los resultados en paper antes de usar dinero real.

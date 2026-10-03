@@ -1,0 +1,14 @@
+[project]
+name = "decisor"
+version = "0.1.0"
+description = "Vigila publicaciones que mueven mercado, las analiza con Claude y propone operaciones en IBKR"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 125
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

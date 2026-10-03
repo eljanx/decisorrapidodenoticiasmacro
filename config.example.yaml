@@ -1,0 +1,79 @@
+# Copia este fichero a config.yaml y ajústalo.
+# Las cuentas añadidas desde Telegram (/seguir) se guardan en la base de datos
+# y se suman a las de este fichero.
+
+# simulado: no toca IBKR, solo registra lo que haría.
+# paper:    IBKR cuenta de simulación (IB Gateway paper, puerto 4002).
+# real:     dinero real (IB Gateway live, puerto 4001). Exige confirmo_dinero_real: true.
+modo: simulado
+confirmo_dinero_real: false
+
+base_datos: decisor.db
+
+fuentes:
+  # Truth Social directo (API pública tipo Mastodon). Es la vía más rápida,
+  # pero no es oficial: Cloudflare puede bloquearla. Si falla, usa el RSS de abajo.
+  - tipo: truthsocial
+    cuenta: realDonaldTrump
+    nombre: Donald Trump
+    intervalo_s: 5
+
+  # Archivo público de Truth Social con RSS (respaldo, algo más lento).
+  - tipo: rss
+    url: https://trumpstruth.org/feed
+    nombre: Donald Trump (RSS)
+    intervalo_s: 15
+
+  - tipo: rss
+    url: https://www.federalreserve.gov/feeds/press_all.xml
+    nombre: Reserva Federal
+    intervalo_s: 30
+
+  # X (Twitter). La lectura por API requiere X_BEARER_TOKEN y es de pago por uso.
+  # Alternativa gratuita: un puente RSS (por ejemplo, RSSHub autoalojado) como tipo: rss.
+  - tipo: x
+    cuenta: elonmusk
+    nombre: Elon Musk
+    intervalo_s: 60
+    activa: false
+
+ia:
+  modelo_triaje: claude-opus-5-5
+  esfuerzo_triaje: low
+  modelo_analisis: claude-opus-5-5
+  esfuerzo_analisis: medium
+  # Busca titulares recientes para decidir si la noticia era esperada (paso 0).
+  # Añade unos segundos de latencia.
+  busqueda_web: true
+  # Umbral de sorpresa preliminar para avisar aunque el triaje dude.
+  umbral_relevancia: 50
+
+mercado:
+  # Activos de referencia cuyo movimiento desde la publicación se le pasa a la IA (paso 2b).
+  referencia: [SPY, QQQ, IWM, TLT, GLD, USO, UUP, XLE, XLF, XLK, SMH, FXI]
+
+riesgo:
+  # Importes en USD (los activos de EE. UU. cotizan en dólares).
+  importes_rapidos: [500, 1000, 2000]
+  max_por_operacion: 2000
+  max_diario: 5000
+  max_posiciones_abiertas: 3
+  # Tipos permitidos para ejecución automática: acciones, etf, futuro, divisa.
+  # Las opciones se proponen pero se ejecutan a mano en esta versión.
+  instrumentos_permitidos: [accion, etf, futuro, divisa]
+  permitir_cortos: false
+  stop_min_pct: 0.3
+  stop_max_pct: 5.0
+  conviccion_minima: 40
+  # La propuesta caduca si pasan estos minutos o el precio se mueve más que esto antes de confirmar.
+  caducidad_min: 10
+  max_deslizamiento_pct: 0.5
+  # Precio límite de entrada = último precio ± este margen.
+  margen_limite_pct: 0.15
+  simbolos_prohibidos: []
+
+ibkr:
+  host: 127.0.0.1
+  puerto: 4002
+  client_id: 17
+  cuenta: ""
