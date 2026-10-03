@@ -160,7 +160,14 @@ class IA:
         if herramientas:
             params["tools"] = herramientas
         for _ in range(4):  # pause_turn: la búsqueda web puede pausar el turno
-            resp = await self.cliente.beta.messages.create(messages=mensajes, **params)
+            try:
+                resp = await self.cliente.beta.messages.create(messages=mensajes, **params)
+            except anthropic.APIStatusError as e:
+                if "credit balance" in str(e):
+                    raise ErrorIA("Sin saldo en la cuenta de Anthropic (Plans & Billing en console.anthropic.com)") from e
+                raise ErrorIA(f"Error de la API de Anthropic ({e.status_code}): {e.message}") from e
+            except anthropic.APIConnectionError as e:
+                raise ErrorIA(f"Sin conexión con la API de Anthropic: {e}") from e
             if resp.stop_reason != "pause_turn":
                 break
             mensajes = [mensajes[0], {"role": "assistant", "content": resp.content}]

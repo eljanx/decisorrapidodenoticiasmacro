@@ -192,3 +192,17 @@ def test_ia_rechazo_y_json_invalido():
         asyncio.run(IA(IACfg(), ClienteFalso([resp("refusal")])).triaje(post()))
     with pytest.raises(ErrorIA):
         asyncio.run(IA(IACfg(), ClienteFalso([resp(texto="no json")])).triaje(post()))
+
+
+def test_ia_error_de_api_se_convierte_en_error_ia():
+    import anthropic
+    import httpx2
+    from decisor.config import IACfg
+
+    class SinSaldo(ClienteFalso):
+        async def _create(self, **kw):
+            r = httpx2.Response(400, request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages"))
+            raise anthropic.BadRequestError("Your credit balance is too low", response=r, body=None)
+
+    with pytest.raises(ErrorIA, match="Sin saldo"):
+        asyncio.run(IA(IACfg(), SinSaldo([])).triaje(post()))
