@@ -3,6 +3,8 @@ chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 set PYTHONUTF8=1
+rem El entorno va en una ruta corta: Windows falla con rutas de mas de 260 caracteres
+set "VENV=%LOCALAPPDATA%\DecisorNoticias\venv"
 title Instalador del Decisor
 echo ============================================================
 echo   INSTALADOR DEL DECISOR RAPIDO DE NOTICIAS
@@ -36,17 +38,18 @@ exit /b 1
 
 :tengo_python
 echo Python encontrado.
-if not exist ".venv\Scripts\python.exe" (
+if exist ".venv" rmdir /s /q ".venv" >nul 2>nul
+if not exist "%VENV%\Scripts\python.exe" (
     echo Preparando el entorno...
-    %PY% -m venv .venv
+    %PY% -m venv "%VENV%"
 )
-if not exist ".venv\Scripts\python.exe" goto :error
+if not exist "%VENV%\Scripts\python.exe" goto :error
 echo Descargando los componentes necesarios...
-".venv\Scripts\python.exe" -m pip install --upgrade pip -q --disable-pip-version-check
-".venv\Scripts\python.exe" -m pip install -r requirements.txt -q --disable-pip-version-check
+"%VENV%\Scripts\python.exe" -m pip install --upgrade pip -q --disable-pip-version-check
+"%VENV%\Scripts\python.exe" -m pip install -r requirements.txt -q --disable-pip-version-check
 if errorlevel 1 goto :error
 echo Componentes instalados.
-".venv\Scripts\python.exe" -m decisor.configurar
+"%VENV%\Scripts\python.exe" -m decisor.configurar
 echo.
 pause
 exit /b 0
