@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 
 AYUDA = """<b>Decisor rápido de noticias macro</b>
 
-/fuentes – cuentas y fuentes vigiladas
+/fuentes – fuentes vigiladas y si están funcionando
 /seguir truth &lt;cuenta&gt; [nombre] – seguir una cuenta de Truth Social
 /seguir x &lt;cuenta&gt; [nombre] – seguir una cuenta de X (requiere API de pago)
 /seguir rss &lt;url&gt; [nombre] [cada N] – seguir un feed RSS (cada N minutos)
@@ -72,6 +72,8 @@ class Decisor:
         self._esperando_importe: int | None = None
         self._bloqueo_ordenes = asyncio.Lock()
         self._en_curso: set[asyncio.Task] = set()
+        self._estado: dict[str, dict] = {}
+        self._arranque = datetime.now(timezone.utc)
 
     # ------------------------------------------------------------------ fuentes
     def _todas_las_fuentes(self) -> list[FuenteCfg]:
@@ -93,44 +95,86 @@ class Decisor:
             tarea.cancel()
         return tarea is not None
 
+    def _marcar(self, clave: str, **campos) -> None:
+        self._estado.setdefault(clave, {}).update(campos)
+
+    async def _desactivada(self, fcfg: FuenteCfg, motivo: str) -> None:
+        self._marcar(fcfg.clave, error=f"desactivada: {motivo}")
+        log.warning("Fuente %s desactivada: %s", fcfg.clave, motivo)
+        await self.notif.enviar(f"⚠️ Fuente <b>{escape(fcfg.nombre)}</b> desactivada: {escape(motivo)}")
+
     async def _vigilar(self, fcfg: FuenteCfg) -> None:
         try:
             fuente = sources.crear(fcfg, self.http, self.cfg.x_bearer_token)
         except sources.FuenteNoDisponible as e:
-            await self.notif.enviar(f"⚠️ Fuente <b>{escape(fcfg.nombre)}</b> desactivada: {escape(str(e))}")
+            await self._desactivada(fcfg, str(e))
             return
+        # Las publicaciones anteriores al arranque se registran sin avisar.
+        corte = self._arranque - timedelta(minutes=10)
         primera = True
         errores = 0
         while True:
             try:
                 posts = await fuente.leer()
                 errores = 0
+                if posts or not primera:
+                    if not self._estado.get(fcfg.clave, {}).get("ok"):
+                        log.info("✔ %s funcionando", fcfg.nombre)
+                    self._marcar(fcfg.clave, ok=datetime.now(timezone.utc), error=None)
                 for post in sorted(posts, key=lambda p: p.publicado):
+                    ultimo = self._estado[fcfg.clave].get("ultimo")
+                    if ultimo is None or post.publicado > ultimo.publicado:
+                        self._marcar(fcfg.clave, ultimo=post)
                     if self.db.ya_visto(post.clave, post.huella):
                         continue
                     self.db.marcar_visto(post.clave, post.huella)
-                    if primera:
-                        continue  # al arrancar no avisamos de lo ya publicado
+                    if primera or post.publicado < corte:
+                        continue
                     self._lanzar(self.procesar(post))
-                primera = False
+                if posts:
+                    primera = False
                 await asyncio.sleep(fcfg.intervalo_s)
             except asyncio.CancelledError:
                 raise
             except sources.FuenteNoDisponible as e:
-                await self.notif.enviar(f"⚠️ Fuente <b>{escape(fcfg.nombre)}</b> desactivada: {escape(str(e))}")
+                await self._desactivada(fcfg, str(e))
                 return
             except sources.Limitada as e:
                 log.warning("%s limitada, espero %.0fs", fcfg.clave, e.espera_s)
+                self._marcar(fcfg.clave, error=f"nos pide esperar {e.espera_s:.0f} s (normal, reintenta solo)")
                 await asyncio.sleep(e.espera_s)
             except Exception as e:
                 errores += 1
                 espera = min(fcfg.intervalo_s * 2 ** errores, 300)
                 log.warning("Error en %s (%s), reintento en %.0fs", fcfg.clave, e, espera)
+                self._marcar(fcfg.clave, error=str(e)[:150])
                 if errores == 5:
                     await self.notif.enviar(
                         f"⚠️ La fuente <b>{escape(fcfg.nombre)}</b> falla repetidamente: {escape(str(e)[:200])}"
                     )
                 await asyncio.sleep(espera)
+
+    def informe_fuentes(self) -> str:
+        lineas = []
+        for clave, f in self._fuentes_cfg.items():
+            est = self._estado.get(clave, {})
+            if est.get("error"):
+                icono, detalle = "⚠️", est["error"]
+            elif est.get("ok"):
+                icono, detalle = "✅", f"comprobado hace {_hace(est['ok'])}"
+            else:
+                icono, detalle = "⏳", "conectando…"
+            linea = f"{icono} <b>{escape(f.nombre)}</b> (cada {f.intervalo_s:g} s) – {escape(detalle)}"
+            if est.get("ultimo"):
+                u = est["ultimo"]
+                linea += f"\n     último post hace {_hace(u.publicado)}: «{escape(u.texto[:80])}»"
+            linea += f"\n     <code>{escape(clave)}</code>"
+            lineas.append(linea)
+        return "<b>Fuentes vigiladas</b>\n\n" + ("\n\n".join(lineas) or "ninguna")
+
+    async def _resumen_arranque(self) -> None:
+        await asyncio.sleep(90)
+        await self.notif.enviar(self.informe_fuentes() + "\n\nPuedes volver a verlo cuando quieras con /fuentes")
 
     def _lanzar(self, coro) -> None:
         tarea = asyncio.create_task(coro)
@@ -348,9 +392,7 @@ class Decisor:
         if cmd in ("/start", "/ayuda", "/help"):
             await self.notif.enviar(AYUDA)
         elif cmd == "/fuentes":
-            lineas = [f"• <b>{escape(f.nombre)}</b> – <code>{escape(f.clave)}</code> cada {f.intervalo_s:g}s"
-                      for f in self._fuentes_cfg.values()]
-            await self.notif.enviar("<b>Fuentes activas</b>\n" + ("\n".join(lineas) or "ninguna"))
+            await self.notif.enviar(self.informe_fuentes())
         elif cmd == "/seguir":
             await self._seguir(args)
         elif cmd == "/dejar" and args:
@@ -422,6 +464,7 @@ class Decisor:
         for f in self._todas_las_fuentes():
             self._arrancar_fuente(f)
         await self.notif.enviar(
-            f"🟢 Decisor arrancado · modo <b>{self.cfg.modo}</b> · {len(self._fuentes_cfg)} fuentes. /ayuda"
+            f"🟢 Decisor arrancado · modo <b>{self.cfg.modo}</b> · {len(self._fuentes_cfg)} fuentes.\n"
+            "En un minuto y medio te digo cuáles están funcionando. /ayuda"
         )
-        await asyncio.gather(self.notif.escuchar(self.manejar), self._vigilar_horizontes())
+        await asyncio.gather(self.notif.escuchar(self.manejar), self._vigilar_horizontes(), self._resumen_arranque())

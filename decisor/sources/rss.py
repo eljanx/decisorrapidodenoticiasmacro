@@ -10,7 +10,7 @@ import feedparser
 from curl_cffi.requests import AsyncSession
 
 from ..modelos import Publicacion
-from .base import Fuente, Limitada, html_a_texto
+from .base import Fuente, FuenteNoDisponible, Limitada, html_a_texto
 
 
 class RSS(Fuente):
@@ -31,6 +31,8 @@ class RSS(Fuente):
         r = await self._sesion.get(self.cfg.url, headers=cab, allow_redirects=True)
         if r.status_code == 304:
             return []
+        if r.status_code in (404, 410):
+            raise FuenteNoDisponible(f"la dirección {self.cfg.url} no existe (error {r.status_code})")
         if r.status_code == 429:
             raise Limitada(max(float(r.headers.get("retry-after") or 0), 120))
         r.raise_for_status()

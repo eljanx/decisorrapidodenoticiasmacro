@@ -209,3 +209,42 @@ def test_ia_error_de_api_se_convierte_en_error_ia():
 
     with pytest.raises(ErrorIA, match="Sin saldo"):
         asyncio.run(IA(IACfg(), SinSaldo([])).triaje(post()))
+
+
+def test_vigilar_no_avisa_de_lo_antiguo_y_muestra_estado(tmp_path, monkeypatch):
+    from datetime import timedelta
+
+    from decisor import sources
+    from decisor.config import FuenteCfg
+
+    ahora = datetime.now(timezone.utc)
+    viejo = Publicacion(fuente="f", autor="Trump", id_externo="1", texto="viejo", publicado=ahora - timedelta(hours=3))
+    nuevo = Publicacion(fuente="f", autor="Trump", id_externo="2", texto="nuevo", publicado=ahora)
+    lecturas = [[], [viejo], [viejo, nuevo]]  # 1ª vacía (limitada), 2ª historial, 3ª novedad
+
+    class Falsa:
+        async def leer(self):
+            if not lecturas:
+                raise asyncio.CancelledError
+            return lecturas.pop(0)
+
+    monkeypatch.setattr(sources, "crear", lambda *a, **k: Falsa())
+
+    async def run():
+        d, notif = montar(tmp_path)
+        procesados = []
+
+        async def procesar(post):
+            procesados.append(post.texto)
+
+        d.procesar = procesar
+        fcfg = FuenteCfg(tipo="rss", url="http://x", nombre="Prueba", intervalo_s=0)
+        d._fuentes_cfg[fcfg.clave] = fcfg
+        with pytest.raises(asyncio.CancelledError):
+            await d._vigilar(fcfg)
+        await asyncio.sleep(0)
+        assert procesados == ["nuevo"]
+        informe = d.informe_fuentes()
+        assert "✅" in informe and "nuevo" in informe
+
+    asyncio.run(run())
