@@ -139,8 +139,11 @@ def test_seguir_y_dejar_fuentes(tmp_path):
         await d.manejar("comando", "/seguir truth @WhiteHouse Casa Blanca")
         assert "truthsocial:WhiteHouse" in d._fuentes_cfg
         assert d.db.fuentes_extra()[0]["nombre"] == "Casa Blanca"
+        await d.manejar("comando", "/seguir rss https://www.whitehouse.gov/news/feed/ Casa Blanca cada 10")
+        f = d._fuentes_cfg["rss:https://www.whitehouse.gov/news/feed/"]
+        assert f.intervalo_s == 600 and f.nombre == "Casa Blanca"
         await d.manejar("comando", "/dejar truthsocial:WhiteHouse")
-        assert d.db.fuentes_extra() == []
+        assert [x["nombre"] for x in d.db.fuentes_extra()] == ["Casa Blanca"]
 
     asyncio.run(run())
 

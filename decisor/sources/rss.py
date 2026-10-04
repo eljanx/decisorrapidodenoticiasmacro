@@ -7,26 +7,32 @@ import calendar
 from datetime import datetime, timezone
 
 import feedparser
+from curl_cffi.requests import AsyncSession
 
 from ..modelos import Publicacion
-from .base import CABECERAS, Fuente, Limitada, html_a_texto
+from .base import Fuente, Limitada, html_a_texto
 
 
 class RSS(Fuente):
+    """Usa huella de navegador (curl_cffi): webs como whitehouse.gov rechazan clientes que no lo parecen."""
+
     _etag: str | None = None
     _modificado: str | None = None
+    _sesion: AsyncSession | None = None
 
     async def leer(self) -> list[Publicacion]:
-        cab = dict(CABECERAS)
+        if self._sesion is None:
+            self._sesion = AsyncSession(impersonate="chrome", timeout=20)
+        cab = {}
         if self._etag:
             cab["If-None-Match"] = self._etag
         if self._modificado:
             cab["If-Modified-Since"] = self._modificado
-        r = await self.http.get(self.cfg.url, headers=cab, follow_redirects=True)
+        r = await self._sesion.get(self.cfg.url, headers=cab, allow_redirects=True)
         if r.status_code == 304:
             return []
         if r.status_code == 429:
-            raise Limitada(float(r.headers.get("retry-after", 60)))
+            raise Limitada(max(float(r.headers.get("retry-after") or 0), 120))
         r.raise_for_status()
         self._etag = r.headers.get("etag")
         self._modificado = r.headers.get("last-modified")

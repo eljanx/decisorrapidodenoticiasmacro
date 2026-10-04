@@ -26,7 +26,7 @@ AYUDA = """<b>Decisor rápido de noticias macro</b>
 /fuentes – cuentas y fuentes vigiladas
 /seguir truth &lt;cuenta&gt; [nombre] – seguir una cuenta de Truth Social
 /seguir x &lt;cuenta&gt; [nombre] – seguir una cuenta de X (requiere API de pago)
-/seguir rss &lt;url&gt; [nombre] – seguir un feed RSS
+/seguir rss &lt;url&gt; [nombre] [cada N] – seguir un feed RSS (cada N minutos)
 /dejar &lt;clave&gt; – dejar de seguir (la clave sale en /fuentes)
 /pausa – no ejecutar operaciones (los avisos siguen)
 /reanudar – volver a permitir operaciones
@@ -398,9 +398,14 @@ class Decisor:
             return
         tipo = {"truth": "truthsocial", "x": "x", "rss": "rss"}[args[0]]
         objetivo = args[1].lstrip("@")
-        nombre = " ".join(args[2:]) or objetivo
-        datos = {"tipo": tipo, "nombre": nombre,
-                 "intervalo_s": {"truthsocial": 5, "x": 60, "rss": 20}[tipo]}
+        resto = args[2:]
+        intervalo = {"truthsocial": 20, "x": 60, "rss": 60}[tipo]
+        # "/seguir rss <url> Nombre cada 10" → cada 10 minutos
+        if len(resto) >= 2 and resto[-2].lower() == "cada" and resto[-1].replace(".", "", 1).isdigit():
+            intervalo = float(resto[-1]) * 60
+            resto = resto[:-2]
+        nombre = " ".join(resto) or objetivo
+        datos = {"tipo": tipo, "nombre": nombre, "intervalo_s": intervalo}
         datos["url" if tipo == "rss" else "cuenta"] = objetivo
         fcfg = FuenteCfg.model_validate(datos)
         self.db.guardar_fuente(fcfg.clave, fcfg.model_dump())

@@ -63,5 +63,38 @@ def test_truthsocial_se_desactiva_tras_bloqueos_repetidos():
     for _ in range(2):
         with pytest.raises(RuntimeError):
             asyncio.run(f.leer())
+        f._no_antes_de = 0
     with pytest.raises(FuenteNoDisponible, match="RSS de respaldo"):
         asyncio.run(f.leer())
+
+
+def test_truthsocial_respeta_limites():
+    import asyncio
+    import time
+
+    import pytest
+
+    from decisor.sources.base import Limitada
+    from decisor.sources.truthsocial import espera_limite
+
+    assert espera_limite({"retry-after": "0"}, 120) == 120  # nunca "esperar 0 s"
+    assert 290 < espera_limite({"x-ratelimit-reset": str(time.time() + 300)}, 60) <= 300
+    assert espera_limite({}, 60) == 60
+
+    class Resp:
+        status_code = 429
+        headers = {"retry-after": "0"}
+
+    class Sesion:
+        llamadas = 0
+
+        async def get(self, *a, **k):
+            Sesion.llamadas += 1
+            return Resp()
+
+    f = TruthSocial(FuenteCfg(tipo="truthsocial", cuenta="realDonaldTrump", nombre="Trump"), http=None)
+    f._sesion = Sesion()
+    with pytest.raises(Limitada) as e:
+        asyncio.run(f.leer())
+    assert e.value.espera_s >= 120
+    assert asyncio.run(f.leer()) == [] and Sesion.llamadas == 1  # no vuelve a preguntar antes de tiempo

@@ -16,13 +16,23 @@ fuentes:
   - tipo: truthsocial
     cuenta: realDonaldTrump
     nombre: Donald Trump
-    intervalo_s: 5
+    intervalo_s: 20
 
   # Archivo público de Truth Social con RSS (respaldo, algo más lento).
   - tipo: rss
     url: https://trumpstruth.org/feed
     nombre: Donald Trump (RSS)
     intervalo_s: 15
+
+  - tipo: rss
+    url: https://www.whitehouse.gov/news/feed/
+    nombre: Casa Blanca (noticias)
+    intervalo_s: 120
+
+  - tipo: rss
+    url: https://www.whitehouse.gov/presidential-actions/feed/
+    nombre: Casa Blanca (órdenes ejecutivas)
+    intervalo_s: 120
 
   - tipo: rss
     url: https://www.federalreserve.gov/feeds/press_all.xml
