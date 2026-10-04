@@ -41,3 +41,27 @@ def test_huella_ignora_urls_y_mayusculas():
     a = Publicacion(fuente="truthsocial:t", id_externo="1", texto="BIG tariffs! https://t.co/a", **kw)
     b = Publicacion(fuente="rss:t", id_externo="zz", texto="big tariffs", **kw)
     assert a.huella == b.huella and a.clave != b.clave
+
+
+def test_truthsocial_se_desactiva_tras_bloqueos_repetidos():
+    import asyncio
+
+    import pytest
+
+    from decisor.sources.base import FuenteNoDisponible
+
+    class Resp:
+        status_code = 403
+        headers = {}
+
+    class Sesion:
+        async def get(self, *a, **k):
+            return Resp()
+
+    f = TruthSocial(FuenteCfg(tipo="truthsocial", cuenta="realDonaldTrump", nombre="Trump"), http=None)
+    f._sesion = Sesion()
+    for _ in range(2):
+        with pytest.raises(RuntimeError):
+            asyncio.run(f.leer())
+    with pytest.raises(FuenteNoDisponible, match="RSS de respaldo"):
+        asyncio.run(f.leer())

@@ -21,6 +21,11 @@ USAR (cada vez)
        /probar We are imposing a 100% tariff on all semiconductors
   5. Escribe /ayuda al bot para ver todo lo que puede hacer.
 
+ACTUALIZAR (cuando Claude te diga que hay una version nueva)
+  1. Cierra la ventana negra de la app.
+  2. Doble clic en ACTUALIZAR.bat
+  3. Doble clic en ARRANCAR.bat
+
 IMPORTANTE
   - El ordenador debe estar encendido y sin suspenderse:
     Configuracion > Sistema > Inicio/apagado > "Suspender" = Nunca (cuando esta enchufado).

@@ -8,21 +8,46 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from curl_cffi.requests import AsyncSession
+
 from ..modelos import Publicacion
-from .base import CABECERAS, Fuente, FuenteNoDisponible, Limitada, html_a_texto
+from .base import Fuente, FuenteNoDisponible, Limitada, html_a_texto
 
 BASE = "https://truthsocial.com/api/v1"
+MAX_BLOQUEOS = 3
 
 
 class TruthSocial(Fuente):
+    """Usa curl_cffi para presentarse como un navegador Chrome: Cloudflare bloquea
+    las peticiones que no lo parecen (error 403)."""
+
     _id_cuenta: str | None = None
     _ultimo_id: str | None = None
+    _sesion: AsyncSession | None = None
+    _bloqueos = 0
+
+    async def _get(self, ruta: str, params: dict):
+        if self._sesion is None:
+            self._sesion = AsyncSession(impersonate="chrome", timeout=15)
+        r = await self._sesion.get(f"{BASE}{ruta}", params=params)
+        if r.status_code == 403:
+            self._bloqueos += 1
+            if self._bloqueos >= MAX_BLOQUEOS:
+                raise FuenteNoDisponible(
+                    "Truth Social bloquea el acceso directo desde tu conexión. "
+                    "No pasa nada: sigo recibiendo sus publicaciones por el RSS de respaldo (algo más lento)."
+                )
+            raise RuntimeError("403 de Truth Social (bloqueo de Cloudflare)")
+        self._bloqueos = 0
+        if r.status_code == 429:
+            raise Limitada(float(r.headers.get("retry-after", 30)))
+        r.raise_for_status()
+        return r
 
     async def _resolver_cuenta(self) -> str:
-        r = await self.http.get(f"{BASE}/accounts/lookup", params={"acct": self.cfg.cuenta}, headers=CABECERAS)
+        r = await self._get("/accounts/lookup", {"acct": self.cfg.cuenta})
         if r.status_code == 404:
             raise FuenteNoDisponible(f"Cuenta de Truth Social no encontrada: {self.cfg.cuenta}")
-        r.raise_for_status()
         return str(r.json()["id"])
 
     async def leer(self) -> list[Publicacion]:
@@ -31,10 +56,7 @@ class TruthSocial(Fuente):
         params = {"exclude_replies": "true", "limit": "20"}
         if self._ultimo_id:
             params["since_id"] = self._ultimo_id
-        r = await self.http.get(f"{BASE}/accounts/{self._id_cuenta}/statuses", params=params, headers=CABECERAS)
-        if r.status_code == 429:
-            raise Limitada(float(r.headers.get("retry-after", 30)))
-        r.raise_for_status()
+        r = await self._get(f"/accounts/{self._id_cuenta}/statuses", params)
         estados = r.json()
         if estados:
             self._ultimo_id = max((str(e["id"]) for e in estados), key=int)
